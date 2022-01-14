@@ -2,17 +2,13 @@
 #include "Types.h"
 
 class BinaryStream {
-public:
+ public:
   unsigned char *data;
   int readPosition = 0;
   int writePosition = 0;
-  BinaryStream(int size) {
-    this->data = Allocate<unsigned char>(size);
-  }
+  BinaryStream(int size) { this->data = Allocate<unsigned char>(size); }
 
-  BinaryStream(void *data, int size) {
-    this->data = (unsigned char*)data;
-  }
+  BinaryStream(void *data, int size) { this->data = (unsigned char *)data; }
 
   void read(void *data, int size) {
     memcpy(data, this->data + this->readPosition, size);
@@ -113,9 +109,7 @@ public:
     return result;
   }
 
-  unsigned char readByte() {
-    return this->data[this->readPosition++];
-  }
+  unsigned char readByte() { return this->data[this->readPosition++]; }
 
   i32 readVarInt() {
     int result = 0;
@@ -305,7 +299,7 @@ public:
   //     this->writeByte(value[i]);
   //   }
   // }
-  
+
   // std::string readString() {
   //   int length = this->readVarInt();
   //   std::string result = "";
@@ -314,8 +308,6 @@ public:
   //   }
   //   return result;
   // }
-  
-  ~BinaryStream() {
-    Deallocate(this->data);
-  }
+
+  ~BinaryStream() { Deallocate(this->data); }
 };

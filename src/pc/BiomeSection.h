@@ -1,5 +1,3 @@
 #pragma once
 
-class BiomeSection {
-
-};
+class BiomeSection {};

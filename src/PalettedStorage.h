@@ -1,12 +1,12 @@
 #pragma once
-#include "Memory.h"
-#include "Types.h"
-#include "PalettedStorage.h"
 #include "BinaryStream.h"
+#include "Memory.h"
+#include "PalettedStorage.h"
+#include "Types.h"
 
 template <typename Word = unsigned int>
 class PalettedStorage {
-public:
+ public:
   const int wordByteSize = sizeof(Word);
   const int wordBitSize = wordByteSize * 8;
   int bitsPerBlock;
@@ -16,7 +16,7 @@ public:
   int mask;
   int byteSize;
   Word *words;
-  
+
   PalettedStorage(int bitsPerBlock, int capacity = 4096) {
     this->bitsPerBlock = bitsPerBlock;
     this->blocksPerWord = FLOOR(wordBitSize / bitsPerBlock);
@@ -28,9 +28,7 @@ public:
     this->words = Allocate<Word>(this->wordsCount);
   }
 
-  void read(BinaryStream &stream) {
-    stream.read(this->words, this->byteSize);
-  }
+  void read(BinaryStream &stream) { stream.read(this->words, this->byteSize); }
 
   void write(BinaryStream &stream) {
     stream.write(this->words, this->byteSize);
@@ -46,11 +44,13 @@ public:
   }
 
   void getIndex(byte x, byte y, byte z, int &index, int &offset) {
-    x &= 0xf; y &= 0xf; z &= 0xf;
+    x &= 0xf;
+    y &= 0xf;
+    z &= 0xf;
 
-		index = FLOOR(((x << 8) | (z << 4) | y) / blocksPerWord);
-		offset = (((x << 8) | (z << 4) | y) % blocksPerWord) * this->bitsPerBlock;
-	}
+    index = FLOOR(((x << 8) | (z << 4) | y) / blocksPerWord);
+    offset = (((x << 8) | (z << 4) | y) % blocksPerWord) * this->bitsPerBlock;
+  }
 
   int getAt(byte x, byte y, byte z) {
     int index, offset;
@@ -85,9 +85,7 @@ public:
     }
   }
 
-  ~PalettedStorage() {
-    Deallocate(this->words);
-  }
+  ~PalettedStorage() { Deallocate(this->words); }
 };
 
 inline void test_palletedStorage() {

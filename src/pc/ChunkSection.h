@@ -7,9 +7,7 @@ struct ChunkSection {
   // if this is zero this section does not exist
   int paletteLength = 0;
 
-  inline bool isEmpty() {
-    return paletteLength == 0;
-  }
+  inline bool isEmpty() { return paletteLength == 0; }
 
   inline int getIndex(const Vec3 &pos) {
     return (pos.y & 0xf) << 8 | (pos.z & 0xf) << 4 | (pos.x & 0xf);
@@ -19,9 +17,7 @@ struct ChunkSection {
     blocks[getIndex(pos)] = stateId;
   }
 
-  int getBlockStateId(const Vec3 &pos) {
-    return blocks[getIndex(pos)];
-  }
+  int getBlockStateId(const Vec3 &pos) { return blocks[getIndex(pos)]; }
 
   void read(BinaryStream &stream) {
     u16 occupiedBlocks = stream.readShortBE();
@@ -30,7 +26,8 @@ struct ChunkSection {
     if (!bitsPerBlock) {
       this->paletteLength = 1;
       this->palette[0] = stream.readVarInt();
-      assert(stream.readByte() == 0, "Expected to read 0 length data for 1 length palette");
+      assert(stream.readByte() == 0,
+             "Expected to read 0 length data for 1 length palette");
       return;
     }
 
@@ -51,10 +48,10 @@ struct ChunkSection {
     auto bitsPerBlock = 32 - __builtin_clz(this->paletteLength - 1);
 
     if (!bitsPerBlock) {
-      stream.writeShortBE(0); // occupied blocks
-      stream.writeByte(0); // bits per block
-      stream.writeVarInt(this->palette[0]); // palette
-      stream.writeByte(0); // palette length
+      stream.writeShortBE(0);                // occupied blocks
+      stream.writeByte(0);                   // bits per block
+      stream.writeVarInt(this->palette[0]);  // palette
+      stream.writeByte(0);                   // palette length
       return;
     }
 
@@ -69,12 +66,8 @@ struct ChunkSection {
 };
 
 class BiomeSection : public ChunkSection {
-public:
-  void setBiomeId(const Vec3 &pos, int biome) {
-    blocks[getIndex(pos)] = biome;
-  }
+ public:
+  void setBiomeId(const Vec3 &pos, int biome) { blocks[getIndex(pos)] = biome; }
 
-  int getBiomeId(const Vec3 &pos) {
-    return blocks[getIndex(pos)];
-  }
+  int getBiomeId(const Vec3 &pos) { return blocks[getIndex(pos)]; }
 };
