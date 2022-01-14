@@ -21,6 +21,8 @@ class BinaryStream {
     this->writePosition += size;
   }
 
+  void skip(int size) { this->readPosition += size; }
+
   i64 readLongLE() {
     long long result = 0;
     for (int i = 0; i < 8; i++) {

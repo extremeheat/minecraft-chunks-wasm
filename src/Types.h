@@ -16,11 +16,15 @@ using byte = u8;
 #define out
 
 struct Vec3 {
-  int x;
-  int y;
-  int z;
+   int x;
+   int y;
+   int z;
 
-  int operator==(const Vec3 &other) {
-    return x == other.x && y == other.y && z == other.z;
-  }
+   int operator==(const Vec3 &other) {
+      return x == other.x && y == other.y && z == other.z;
+   }
+};
+
+class Registry {
+
 };

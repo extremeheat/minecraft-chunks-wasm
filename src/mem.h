@@ -1,8 +1,9 @@
 #pragma once
 
-#ifndef WEBASSEMBLY
+// #ifndef WEBASSEMBLYz
 #include <memory.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 template <typename T>
 inline T *Allocate(int size) {
@@ -11,8 +12,7 @@ inline T *Allocate(int size) {
 
 inline void Deallocate(void *ptr) { free(ptr); }
 
-#include <stdio.h>
-void assert(bool condition, const char *message = nullptr) {
+inline void assert(bool condition, const char *message = nullptr) {
   if (!condition) {
     if (message) {
       printf("Assertion failed: %s\n", message);
@@ -22,7 +22,7 @@ void assert(bool condition, const char *message = nullptr) {
     abort();
   }
 }
-#else
+#ifdef WEBASSEMBLYSOMETHING
 
 #include "walloc.h"
 
@@ -33,7 +33,7 @@ void memcpy(void *dest, void *src, size_t n) {
 }
 
 // via
-// https://codereview.stackexchange.com/questions/151019/implementing-realloc-in-c
+// https://codereview.stackexchange.com/a/151038
 void *realloc(void *ptr, size_t originalLength, size_t newLength) {
   if (newLength == 0) {
     free(ptr);
@@ -61,7 +61,7 @@ void abort() {
 
 void assert(bool condition) {
   if (!condition) {
-    abort();
+    // abort();
   }
 }
 

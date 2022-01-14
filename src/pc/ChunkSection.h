@@ -7,6 +7,12 @@ struct ChunkSection {
   // if this is zero this section does not exist
   int paletteLength = 0;
 
+  Registry *registry = nullptr;
+
+  ChunkSection() {  }
+
+  ChunkSection(Registry *registry) : registry(registry) {}
+
   inline bool isEmpty() { return paletteLength == 0; }
 
   inline int getIndex(const Vec3 &pos) {
@@ -36,7 +42,7 @@ struct ChunkSection {
       this->palette[i] = stream.readVarInt();
     }
 
-    auto storage = PalettedStorage(bitsPerBlock);
+    auto storage = PalettedStorage<u64>(bitsPerBlock);
     storage.read(stream);
 
     for (int i = 0; i < 4096; i++) {
@@ -55,7 +61,7 @@ struct ChunkSection {
       return;
     }
 
-    auto storage = PalettedStorage(bitsPerBlock);
+    auto storage = PalettedStorage<u64>(bitsPerBlock);
 
     for (int i = 0; i < 4096; i++) {
       storage.setAt(i & 0xf, (i >> 8) & 0xf, (i >> 4) & 0xf, blocks[i]);

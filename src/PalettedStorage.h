@@ -1,23 +1,28 @@
 #pragma once
-#include "BinaryStream.h"
-#include "Memory.h"
-#include "PalettedStorage.h"
 #include "Types.h"
+#include "Mem.h"
+#include "BinaryStream.h"
 
 template <typename Word = unsigned int>
 class PalettedStorage {
  public:
   const int wordByteSize = sizeof(Word);
   const int wordBitSize = wordByteSize * 8;
-  int bitsPerBlock;
-  int blocksPerWord;
-  int paddingPerWord;
-  int wordsCount;
-  int mask;
-  int byteSize;
-  Word *words;
+  int bitsPerBlock = 0;
+  int blocksPerWord = 0;
+  int paddingPerWord = 0;
+  int wordsCount = 0;
+  int mask = 0;
+  int byteSize = 0;
+  Word *words = nullptr;
+
+  PalettedStorage() {}
 
   PalettedStorage(int bitsPerBlock, int capacity = 4096) {
+    init(bitsPerBlock, capacity);
+  }
+
+  void init(int bitsPerBlock, int capacity = 4096) {
     this->bitsPerBlock = bitsPerBlock;
     this->blocksPerWord = FLOOR(wordBitSize / bitsPerBlock);
     this->paddingPerWord = wordBitSize % bitsPerBlock;
@@ -89,7 +94,7 @@ class PalettedStorage {
 };
 
 inline void test_palletedStorage() {
-  PalettedStorage storage(31);
+  PalettedStorage<> storage(31);
   storage.setAt(1, 0, 0, 0);
   storage.setAt(0, 0, 1, 1);
   storage.setAt(0, 0, 2, 2);
@@ -101,7 +106,7 @@ inline void test_palletedStorage() {
   BinaryStream stream(storage.byteSize);
   storage.write(stream);
 
-  PalettedStorage storage2(31);
+  PalettedStorage<> storage2(31);
   storage2.read(stream);
   // storage2.dumpAll();
   assert(storage2.getAt(1, 0, 0) == 0);

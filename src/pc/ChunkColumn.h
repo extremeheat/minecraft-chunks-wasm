@@ -1,3 +1,4 @@
+#pragma once
 #include "../Block.h"
 #include "../Registry.h"
 #include "../Types.h"
@@ -12,7 +13,8 @@ class ChunkColumn {
   int worldHeight;
   ChunkSection sections[24];
   BiomeSection biomes[24];
-  PalettedStorage<int> blockLights;
+  PalettedStorage<int> skyLights[24];
+  PalettedStorage<int> blockLights[24];
   struct {
     BlockEntity *list;
     int count;
@@ -22,9 +24,14 @@ class ChunkColumn {
   // Chunk offset (to handle negative Y)
   int co;
 
-  ChunkColumn(Registry *registry) : blockLights(4, 16 * 16 * 16 * 24) {
+  ChunkColumn(Registry *registry) {
     this->registry = registry;
     this->co = 4;
+
+    for (int i = 0; i < 24; i++) {
+      this->skyLights[i].init(4, 2048);
+      this->blockLights[i].init(4, 2048);
+    }
   }
 
   void initialize(int (*initFunction)(Vec3)) {
@@ -49,9 +56,15 @@ class ChunkColumn {
   BiomeSection getBiomeSection(int chunkY) { return this->biomes[co + chunkY]; }
 
   Block getFullBlock(const Vec3 &pos) {
-    return {this->getBlockStateId(pos), this->getBiomeId(pos),
-            this->getBlockLight(pos), this->getSkyLight(pos),
-            this->getBlockEntity(pos)};
+    // clang-format off
+    return {
+      this->getBlockStateId(pos),
+      this->getBiomeId(pos),
+      this->getBlockLight(pos), 
+      this->getSkyLight(pos),
+      this->getBlockEntity(pos)
+    };
+    // clang-format on
   }
 
   void setBlock(const Vec3 &pos, Block &block) {
@@ -68,10 +81,12 @@ class ChunkColumn {
 
   int getBlockStateId(const Vec3 &pos) { return 0; }
 
-  int getBiomeId(const Vec3 &pos) { return 0; }
+  int getBiomeId(const Vec3 &pos) {
+    return this->biomes[co + pos.y / 16].getBiomeId(pos);
+  }
 
   int getBlockLight(const Vec3 &pos) {
-    return this->blockLights.getAt(pos.x, pos.y, pos.z);
+    return this->blockLights[co + pos.y >> 4].getAt(pos.x, pos.y & 0xf, pos.z);
   }
 
   int getSkyLight(const Vec3 &pos) { return 0; }
@@ -123,11 +138,11 @@ class ChunkColumn {
   }
 
   void setBlockLight(const Vec3 &pos, int blockLight) {
-    this->blockLights.setAt(pos.x, pos.y, pos.z, blockLight);
+    this->blockLights[co + pos.y >> 4].setAt(pos.x, pos.y & 0xf, pos.z, blockLight);
   }
 
   void setSkyLight(const Vec3 &pos, int skyLight) {
-    // TODO: Implement
+    this->skyLights[co + pos.y >> 4].setAt(pos.x, pos.y & 0xf, pos.z, skyLight);
   }
 
   void setBlockEntity(const Vec3 &pos, BlockEntity blockEntity) {
@@ -163,9 +178,7 @@ class ChunkColumn {
     return stream.write(buffer, bufferSize);
   }
 
-  void fromNetworkSerialized(u8 *buffer, int bufferSize) {
-    BinaryStream stream(buffer, bufferSize);
-
+  void fromNetworkSerialized(BinaryStream &stream) {
     int numberOfSections = 24;
     for (int i = 0; i < numberOfSections; i++) {
       this->sections[i].read(stream);
@@ -173,6 +186,12 @@ class ChunkColumn {
     }
   }
 
+  void fromNetworkSerialized(u8 *buffer, int bufferSize) {
+    BinaryStream stream(buffer, bufferSize);
+    this->fromNetworkSerialized(stream);
+  }
+
+  // https://wiki.vg/index.php?title=Protocol&oldid=17272#Chunk_Data_And_Update_Light
   void loadNetworkSerializedLights(u8 *skyLight, int skyLightLength,
                                    u8 *blockLight, int blockLightLength,
                                    u64 skyLightMask, u64 blockLightMask) {
@@ -180,36 +199,170 @@ class ChunkColumn {
     BinaryStream blockStream(blockLight, blockLightLength);
 
     int numberOfSections = 24;
+    int skyY = 0;
     for (int i = 0; i < numberOfSections; i++) {
-      this->blockLights.read(blockStream);
+      auto sectionMask = (1 << (i - 1));
+      if (skyLightMask & sectionMask) {
+        auto skyLightForSection = skyLight[2048 * skyY++];
+        this->skyLights[i].read(skyStream);
+      }
+      if (blockLightMask & sectionMask) {
+        auto blockLightForSection = blockLight[2048 * i];
+        this->blockLights[i].read(blockStream);
+      }
     }
   }
 
-  // static ChunkColumn* fromSerialized() {
+  static ChunkColumn *readChunkPacket(Registry *registry, u8 *buffer, int len) {
+    BinaryStream stream(buffer, len);
 
-  // }
+    int x = stream.readIntBE();
+    int z = stream.readIntBE();
+    auto heightmaps = skipNBT(stream);
+    if (!heightmaps) {
+      // nbt reading error
+      return reinterpret_cast<ChunkColumn *>(-1);
+    }
 
-  // BinaryStream toSerialized() {
-  //   // This may seem expensive, but it's really cheap. We allocate the max
-  //   size possible on a CC on the
-  //   // stack (which is just moving stack pointer) then we copy it over to the
-  //   heap with the known size. const int max_size = sizeof(ChunkColumn) +
-  //   sizeof(ChunkSection) * 24 + sizeof(BiomeSection) * 24 + (8*8*8*24) /*
-  //   blockLights */ + sizeof(BlockEntity) * (16*16*16*24);
+    ChunkColumn *chunk = new ChunkColumn(registry);
 
-  //   u8 buffer[max_size];
-  //   BinaryStream stream(buffer, max_size);
-  //   for (int i = 0; i < 24; i++) {
-  //     auto section = this->sections[i];
-  //     if (!section.isEmpty()) {
-  //       stream.writeByte(1);
-  //       section.write(stream);
-  //     }
-  //   }
-  //   for (int i = 0; i < 24; i++) {
-  //     auto section = this->biomes[i];
-  //     stream.write(section.toSerialized());
-  //   }
-  //   return stream;
-  // }
+    auto chunkPayloadSize = stream.readVarInt();
+    chunk->fromNetworkSerialized(stream);
+
+    auto blockEntitiesCount = stream.readVarInt();
+    for (int i = 0; i < blockEntitiesCount; i++) {
+      auto sXZ = stream.readByte();
+      auto sY = stream.readShortBE();
+      auto blockEntityType = stream.readVarInt();
+      auto blockEntityNbt = skipNBT(stream);
+    }
+    auto trustEdges = stream.readByte();
+
+    u64 skyLightMask = 0, blockLightMask = 0;
+
+    auto skyLightMaskLen = stream.readVarInt();
+    if (skyLightMask) {
+      skyLightMask = stream.readLongBE();
+    }
+
+    auto blockLightMaskLen = stream.readVarInt();
+    if (blockLightMask) {
+      blockLightMask = stream.readLongBE();
+    }
+
+    auto emptySkyLightMaskLen = stream.readVarInt();
+    if (emptySkyLightMaskLen) {
+      stream.readLongBE();
+    }
+    auto emptyBlockLightMaskLen = stream.readVarInt();
+    if (emptyBlockLightMaskLen) {
+      stream.readLongBE();
+    }
+
+    u8 skylight[2048 * 24];
+    u8 blocklight[2048 * 24];
+
+    auto skyLightLength = stream.readVarInt();
+    for (int i = 0; i < skyLightLength; i++) {
+      stream.read((void *)skylight[2048 * i], 2048);
+    }
+    auto blockLightLength = stream.readVarInt();
+    for (int i = 0; i < blockLightLength; i++) {
+      stream.read((void *)blocklight[2048 * i], 2048);
+    }
+
+    chunk->loadNetworkSerializedLights(skylight, skyLightLength, blocklight,
+                                       blockLightLength, skyLightMask,
+                                       blockLightMask);
+  }
 };
+
+enum NBTTag {
+  TAG_End = 0,
+  TAG_Byte = 1,
+  TAG_Short = 2,
+  TAG_Int = 3,
+  TAG_Long = 4,
+  TAG_Float = 5,
+  TAG_Double = 6,
+  TAG_Byte_Array = 7,
+  TAG_String = 8,
+  TAG_List = 9,
+  TAG_Compound = 10,
+  TAG_Int_Array = 11
+};
+
+bool skipNBT(BinaryStream stream) {
+  auto tagType = stream.readByte();
+
+  if (tagType == TAG_End) {
+    return true;
+  } else if (tagType == TAG_Byte) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    stream.skip(1);
+  } else if (tagType == TAG_Short) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    stream.skip(2);
+  } else if (tagType == TAG_Int) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    stream.skip(4);
+  } else if (tagType == TAG_Long) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    stream.skip(8);
+  } else if (tagType == TAG_Float) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    stream.skip(4);
+  } else if (tagType == TAG_Double) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    stream.skip(8);
+  } else if (tagType == TAG_Byte_Array) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    short length = stream.readShortBE();
+    stream.skip(length);
+  } else if (tagType == TAG_String) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    short length = stream.readShortBE();
+    stream.skip(length);
+  } else if (tagType == TAG_List) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    short length = stream.readShortBE();
+    stream.skip(length);
+    skipNBT(stream);
+  } else if (tagType == TAG_Compound) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    while (true) {
+      skipNBT(stream);
+      tagType = stream.readByte();
+      if (tagType == TAG_End) {
+        break;
+      }
+    }
+  } else if (tagType == TAG_Int_Array) {
+    short nameLength = stream.readShortBE();
+    stream.skip(nameLength);
+    short length = stream.readShortBE();
+    stream.skip(length * 4);
+  } else {
+    assert(false, "Unknown tag type");
+    return false;
+  }
+}
+
+void getNBT(BinaryStream &stream, out char *buffer, out int len) {
+  auto startingPosition = stream.readPosition;
+  skipNBT(stream);
+  auto endPosition = stream.readPosition;
+  auto size = endPosition - startingPosition;
+  stream.readPosition = startingPosition;
+  stream.write(buffer, len);
+}
