@@ -24,7 +24,3 @@ struct Vec3 {
       return x == other.x && y == other.y && z == other.z;
    }
 };
-
-class Registry {
-
-};

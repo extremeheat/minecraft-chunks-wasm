@@ -2,6 +2,7 @@
 #include "../Block.h"
 #include "../Registry.h"
 #include "../Types.h"
+#include "../mcutil/nbt.h"
 #include "BiomeSection.h"
 #include "ChunkSection.h"
 
@@ -36,7 +37,7 @@ class ChunkColumn {
 
   void initialize(int (*initFunction)(Vec3)) {
     // int x = 0, y = 0, z = 0;
-    auto &[x, y, z] = Vec3{0, 0, 0};
+    auto [x, y, z] = Vec3{0, 0, 0};
     for (y = 0; y < this->worldHeight; y++) {
       for (z = 0; z < SectionWidth; z++) {
         for (x = 0; x < SectionWidth; x++) {
@@ -82,11 +83,11 @@ class ChunkColumn {
   int getBlockStateId(const Vec3 &pos) { return 0; }
 
   int getBiomeId(const Vec3 &pos) {
-    return this->biomes[co + pos.y / 16].getBiomeId(pos);
+    return this->biomes[co + (pos.y >> 4)].getBiomeId(pos);
   }
 
   int getBlockLight(const Vec3 &pos) {
-    return this->blockLights[co + pos.y >> 4].getAt(pos.x, pos.y & 0xf, pos.z);
+    return this->blockLights[co + (pos.y >> 4)].getAt(pos.x, pos.y & 0xf, pos.z);
   }
 
   int getSkyLight(const Vec3 &pos) { return 0; }
@@ -138,11 +139,12 @@ class ChunkColumn {
   }
 
   void setBlockLight(const Vec3 &pos, int blockLight) {
-    this->blockLights[co + pos.y >> 4].setAt(pos.x, pos.y & 0xf, pos.z, blockLight);
+    this->blockLights[co + (pos.y >> 4)].setAt(pos.x, pos.y & 0xf, pos.z,
+                                             blockLight);
   }
 
   void setSkyLight(const Vec3 &pos, int skyLight) {
-    this->skyLights[co + pos.y >> 4].setAt(pos.x, pos.y & 0xf, pos.z, skyLight);
+    this->skyLights[co + (pos.y >> 4)].setAt(pos.x, pos.y & 0xf, pos.z, skyLight);
   }
 
   void setBlockEntity(const Vec3 &pos, BlockEntity blockEntity) {
@@ -166,8 +168,8 @@ class ChunkColumn {
                          (8 * 8 * 8 * 24) /* blockLights */ +
                          sizeof(BlockEntity) * (16 * 16 * 16 * 24);
 
-    u8 buffer[max_size];
-    BinaryStream stream(buffer, max_size);
+    u8 tempBuffer[max_size];
+    BinaryStream stream(tempBuffer, max_size);
 
     int numberOfSections = 24;
     for (int i = 0; i < numberOfSections; i++) {
@@ -264,105 +266,17 @@ class ChunkColumn {
 
     auto skyLightLength = stream.readVarInt();
     for (int i = 0; i < skyLightLength; i++) {
-      stream.read((void *)skylight[2048 * i], 2048);
+      stream.read(&skylight[2048 * i], 2048);
     }
     auto blockLightLength = stream.readVarInt();
     for (int i = 0; i < blockLightLength; i++) {
-      stream.read((void *)blocklight[2048 * i], 2048);
+      stream.read(&blocklight[2048 * i], 2048);
     }
 
     chunk->loadNetworkSerializedLights(skylight, skyLightLength, blocklight,
                                        blockLightLength, skyLightMask,
                                        blockLightMask);
+
+    return chunk;
   }
 };
-
-enum NBTTag {
-  TAG_End = 0,
-  TAG_Byte = 1,
-  TAG_Short = 2,
-  TAG_Int = 3,
-  TAG_Long = 4,
-  TAG_Float = 5,
-  TAG_Double = 6,
-  TAG_Byte_Array = 7,
-  TAG_String = 8,
-  TAG_List = 9,
-  TAG_Compound = 10,
-  TAG_Int_Array = 11
-};
-
-bool skipNBT(BinaryStream stream) {
-  auto tagType = stream.readByte();
-
-  if (tagType == TAG_End) {
-    return true;
-  } else if (tagType == TAG_Byte) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    stream.skip(1);
-  } else if (tagType == TAG_Short) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    stream.skip(2);
-  } else if (tagType == TAG_Int) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    stream.skip(4);
-  } else if (tagType == TAG_Long) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    stream.skip(8);
-  } else if (tagType == TAG_Float) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    stream.skip(4);
-  } else if (tagType == TAG_Double) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    stream.skip(8);
-  } else if (tagType == TAG_Byte_Array) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    short length = stream.readShortBE();
-    stream.skip(length);
-  } else if (tagType == TAG_String) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    short length = stream.readShortBE();
-    stream.skip(length);
-  } else if (tagType == TAG_List) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    short length = stream.readShortBE();
-    stream.skip(length);
-    skipNBT(stream);
-  } else if (tagType == TAG_Compound) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    while (true) {
-      skipNBT(stream);
-      tagType = stream.readByte();
-      if (tagType == TAG_End) {
-        break;
-      }
-    }
-  } else if (tagType == TAG_Int_Array) {
-    short nameLength = stream.readShortBE();
-    stream.skip(nameLength);
-    short length = stream.readShortBE();
-    stream.skip(length * 4);
-  } else {
-    assert(false, "Unknown tag type");
-    return false;
-  }
-}
-
-void getNBT(BinaryStream &stream, out char *buffer, out int len) {
-  auto startingPosition = stream.readPosition;
-  skipNBT(stream);
-  auto endPosition = stream.readPosition;
-  auto size = endPosition - startingPosition;
-  stream.readPosition = startingPosition;
-  stream.write(buffer, len);
-}
