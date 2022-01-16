@@ -2,9 +2,11 @@
 #include "./Types.h"
 
 struct BlockEntity {
-  const char *tag;
-  int tagLength;
+  const char *tag = nullptr;
+  int tagLength = 0;
   Vec3 position;
+
+  BlockEntity(const i8 *tag, int tagLength) : tag(tag), tagLength(tagLength) {}
 
   BlockEntity(BlockEntity *other) {
     this->tag = other->tag;

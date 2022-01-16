@@ -97,8 +97,7 @@ class ChunkColumn {
   BlockEntity *getBlockEntity(const Vec3 &pos) {
     for (int i = 0; i < this->blockEntities.count; i++) {
       auto &blockEntity = this->blockEntities.list[i];
-      if (blockEntity.position.x == pos.x && blockEntity.position.y == pos.y &&
-          blockEntity.position.z == pos.z) {
+      if (blockEntity.position == pos) {
         return &blockEntity;
       }
     }
@@ -163,6 +162,7 @@ class ChunkColumn {
         this->blockEntities.list,
         sizeof(BlockEntity) * (this->blockEntities.count + 1));
     assert(this->blockEntities.list != NULL);
+    blockEntity.position = pos;
     this->blockEntities.list[this->blockEntities.count++] = blockEntity;
   }
 
