@@ -70,8 +70,8 @@ struct ChunkSection {
         palette[paletteLength++] = block;
       }
     }
-    // Write palette
 
+    // Write palette
     auto bitsPerBlock = log2ceil(paletteLength);
 
     if (!bitsPerBlock) {

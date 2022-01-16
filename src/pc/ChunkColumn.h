@@ -186,11 +186,7 @@ class ChunkColumn {
     // we copy it over to the heap with the known size.
     // Max chunk size in Anvil/MCRegion format is 1MB/chunk
     // WASM has default stack size limit of 5MB, so no issue here.
-#ifdef _WIN32
-    const int max_size = 500'000;
-#else
     const int max_size = 1'000'000;
-#endif
 
     u8 tempBuffer[max_size];
     BinaryStream stream(tempBuffer, max_size);
@@ -303,26 +299,64 @@ class ChunkColumn {
   }
 
   void writeSimpleHeightMap(BinaryStream &stream) {
-    auto bitsPerBlock = log2ceil(this->numSections << 4);
-    assert(bitsPerBlock == 9, "bitsPerBlock is %d but expected 9",
-           bitsPerBlock);
-    PalettedStorage<u64> storage(bitsPerBlock);
-    for (int y = maxY; y > minY; y++) {
-      for (int x = 0; x < 16; x++) {
-        for (int z = 0; z < 16; z++) {
-          if (this->getBlockStateId({x, y, z}) != 0) {
-            stream.writeVarInt(y);
-            break;
-          }
-        }
-      }
-    }
+    // TODO: actually we can't finish this until we implement the Registry
+    // here... to know what ID an air block is auto bitsPerBlock =
+    // log2ceil(this->numSections << 4); assert(bitsPerBlock == 9, "bitsPerBlock
+    // is %d but expected 9",
+    //        bitsPerBlock);
+    // PalettedStorage<u64> storage(bitsPerBlock);
+    // for (int x = 0; x < 16; x++) {
+    //   for (int z = 0; z < 16; z++) {
+    //     for (int y = maxY; y > minY; y++) {
+    //       if (this->getBlockStateId({x, y, z}) != 0) {
+    //         stream.writeVarInt(y);
+    //         break;
+    //       }
+    //     }
+    //   }
+    // }
   }
 
-  void writeChunkPacket(BinaryStream &stream) {
+  void writeChunkPacket(out u8 *&buffer, out int &bufferSize) {
+    u8 *terrainData;
+    u8 terrainLength = 0;
+    this->writeNetworkSerializedTerrain(terrainData, terrainLength);
+
+    const int max_size = 1'000'000;
+
+    u8 tempBuffer[max_size];
+    BinaryStream stream(tempBuffer, max_size);
+
     stream.writeIntBE(x);
     stream.writeIntBE(z);
-    // stream.write
+    stream.writeByte(NBTTag::TAG_End);
+
+    stream.writeVarInt(terrainLength);
+    stream.write(terrainData, terrainLength);
+
+    free(terrainData);
+
+    stream.writeVarInt(this->blockEntities.count);
+    for (int i = 0; i < this->blockEntities.count; i++) {
+      auto &entity = this->blockEntities.list[i];
+      stream.write((u8 *)entity.tag, entity.tagLength);
+    }
+
+    stream.writeByte(0);  // Trust edge lighting
+
+    stream.writeULongBE(skyLightMask);
+    stream.writeULongBE(blockLightMask);
+    // no idea what the point of "air masks" are
+    stream.writeULongBE(~skyLightMask);
+    stream.writeULongBE(~blockLightMask);
+
+    this->writeNetworkSerializedLights(stream);
+
+    buffer = (u8 *)malloc(stream.writePosition);
+    bufferSize = stream.writePosition;
+    stream.save(buffer);
+
+    return;
   }
 
   static ChunkColumn *readChunkPacket(Registry *registry, u8 *buffer, int len) {
