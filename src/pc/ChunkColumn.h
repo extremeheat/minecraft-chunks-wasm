@@ -9,13 +9,15 @@
 const int SectionWidth = 16;
 const int SectionHeight = 16;
 
+const int NUM_SECTIONS = 24;
+
 class ChunkColumn {
  public:
-  int worldHeight = 319;
-  ChunkSection sections[24];
-  BiomeSection biomes[24];
-  PalettedStorage<int> skyLights[24];
-  PalettedStorage<int> blockLights[24];
+  ChunkSection sections[NUM_SECTIONS];
+  BiomeSection biomes[NUM_SECTIONS];
+  PalettedStorage<int> skyLights[NUM_SECTIONS];
+  PalettedStorage<int> blockLights[NUM_SECTIONS];
+
   struct {
     BlockEntity *list = 0;
     int count = 0;
@@ -24,12 +26,24 @@ class ChunkColumn {
   Registry *registry;
   // Chunk offset (to handle negative Y)
   int co;
+  int numSections;
 
-  ChunkColumn(Registry *registry) {
+  long blockLightMask = 0;
+  long skyLightMask = 0;
+
+  int minY = -4 << 4;
+  int maxY = 20 << 4;
+  int x;
+  int z;
+
+  ChunkColumn(Registry *registry, int x = 0, int z = 0) {
     this->registry = registry;
+    this->x = x;
+    this->z = z;
     this->co = 4;
+    this->numSections = NUM_SECTIONS;
 
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < NUM_SECTIONS; i++) {
       this->skyLights[i].init(4, 2048);
       this->blockLights[i].init(4, 2048);
     }
@@ -38,7 +52,7 @@ class ChunkColumn {
   void initialize(int (*initFunction)(Vec3)) {
     // int x = 0, y = 0, z = 0;
     auto [x, y, z] = Vec3{0, 0, 0};
-    for (y = 0; y < this->worldHeight; y++) {
+    for (y = minY; y < maxY; y++) {
       for (z = 0; z < SectionWidth; z++) {
         for (x = 0; x < SectionWidth; x++) {
           auto block = initFunction({x, y, z});
@@ -181,8 +195,7 @@ class ChunkColumn {
     u8 tempBuffer[max_size];
     BinaryStream stream(tempBuffer, max_size);
 
-    int numberOfSections = 24;
-    for (int i = 0; i < numberOfSections; i++) {
+    for (int i = 0; i < this->numSections; i++) {
       this->sections[i].write(stream);
       this->biomes[i].write(stream);
     }
@@ -195,16 +208,56 @@ class ChunkColumn {
   }
 
   void loadNetworkSerializedTerrain(BinaryStream &stream) {
-    int numberOfSections = 24;
-    for (int i = 0; i < numberOfSections; i++) {
+    for (int i = 0; i < this->numSections; i++) {
       this->sections[i].read(stream);
       this->biomes[i].read(stream);
+      printf("Done %d %d\n", i, stream.readPosition);
     }
+    printf("Read net terrain %d / %d\n", stream.readPosition, stream.size);
+    // stream.dumpRemaining();
   }
 
   void loadNetworkSerializedTerrain(u8 *buffer, int bufferSize) {
     BinaryStream stream(buffer, bufferSize);
     this->loadNetworkSerializedTerrain(stream);
+  }
+
+  void writeNetworkSerializedLights(BinaryStream &stream) {
+    // ok, could be done with less code but Copilot came up with this and it's
+    // actually more efficient :D
+    int skyLights = 0;
+    for (int i = 0; i < this->numSections + 1; i++) {
+      auto mask = 1 << i;
+      if (skyLightMask & mask) {
+        skyLights++;
+      }
+    }
+    stream.writeVarInt(skyLights);
+
+    for (int i = 0; i < this->numSections + 1; i++) {
+      auto mask = 1 << i;
+      if (skyLightMask & mask) {
+        stream.writeVarInt(2048);
+        this->skyLights[i].write(stream);
+      }
+    }
+
+    int blockLights = 0;
+    for (int i = 0; i < this->numSections; i++) {
+      auto mask = 1 << i;
+      if (blockLightMask & mask) {
+        blockLights++;
+      }
+    }
+    stream.writeVarInt(blockLights);
+
+    for (int i = 0; i < this->numSections; i++) {
+      auto mask = 1 << i;
+      if (blockLightMask & mask) {
+        stream.writeVarInt(2048);
+        this->blockLights[i].write(stream);
+      }
+    }
   }
 
   // https://wiki.vg/index.php?title=Protocol&oldid=17272#Chunk_Data_And_Update_Light
@@ -214,19 +267,62 @@ class ChunkColumn {
     BinaryStream skyStream(skyLight, skyLightLength);
     BinaryStream blockStream(blockLight, blockLightLength);
 
-    int numberOfSections = 24;
+    // toss the stupid extraneous light data because we don't store it
+    this->blockLightMask = blockLightMask << 38 >> 38 >> 1;
+    this->skyLightMask = skyLightMask << 38 >> 38 >> 1;
+
     int skyY = 0;
-    for (int i = 0; i < numberOfSections; i++) {
-      auto sectionMask = (1 << (i - 1));
+    int blockY = 0;
+    for (int i = 0; i < this->numSections + 2; i++) {
+      auto currentY = i - 1;
+      auto sectionMask = (1 << i);
+      // light data is sent for +/- 1 real world height, ignore those
+      bool outOfBoundsWeTrack = i == 0 || i == (this->numSections + 1);
+
       if (skyLightMask & sectionMask) {
-        auto skyLightForSection = skyLight[2048 * skyY++];
-        this->skyLights[i].read(skyStream);
+        if (outOfBoundsWeTrack) {
+          skyStream.skip(2048);
+        } else {
+          auto skyLightForSection = skyLight[2048 * skyY++];
+          this->skyLights[currentY].read(skyStream);
+        }
+
+        printf("reading skylight at y=%d\n", i - co);
       }
       if (blockLightMask & sectionMask) {
-        auto blockLightForSection = blockLight[2048 * i];
-        this->blockLights[i].read(blockStream);
+        if (outOfBoundsWeTrack) {
+          blockStream.skip(2048);
+        } else {
+          auto blockLightForSection = blockLight[2048 * blockY++];
+          this->blockLights[currentY].read(blockStream);
+        }
+
+        printf("reading blocklight at y=%d\n", i - co);
       }
     }
+  }
+
+  void writeSimpleHeightMap(BinaryStream &stream) {
+    auto bitsPerBlock = log2ceil(this->numSections << 4);
+    assert(bitsPerBlock == 9, "bitsPerBlock is %d but expected 9",
+           bitsPerBlock);
+    PalettedStorage<u64> storage(bitsPerBlock);
+    for (int y = maxY; y > minY; y++) {
+      for (int x = 0; x < 16; x++) {
+        for (int z = 0; z < 16; z++) {
+          if (this->getBlockStateId({x, y, z}) != 0) {
+            stream.writeVarInt(y);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  void writeChunkPacket(BinaryStream &stream) {
+    stream.writeIntBE(x);
+    stream.writeIntBE(z);
+    // stream.write
   }
 
   static ChunkColumn *readChunkPacket(Registry *registry, u8 *buffer, int len) {
@@ -242,8 +338,15 @@ class ChunkColumn {
 
     ChunkColumn *chunk = new ChunkColumn(registry);
 
+    // The extra zeros at the end are a pain to deal with... we have to skip
+    // them here.
     auto chunkPayloadSize = stream.readVarInt();
+    auto expectedNewPosition = stream.readPosition + chunkPayloadSize;
     chunk->loadNetworkSerializedTerrain(stream);
+    printf("adjusting %d bytes\n", expectedNewPosition - stream.readPosition);
+    stream.readPosition = expectedNewPosition;
+
+    // stream.dumpRemaining();
 
     auto blockEntitiesCount = stream.readVarInt();
     for (int i = 0; i < blockEntitiesCount; i++) {
@@ -257,12 +360,12 @@ class ChunkColumn {
     u64 skyLightMask = 0, blockLightMask = 0;
 
     auto skyLightMaskLen = stream.readVarInt();
-    if (skyLightMask) {
+    if (skyLightMaskLen) {
       skyLightMask = stream.readLongBE();
     }
 
     auto blockLightMaskLen = stream.readVarInt();
-    if (blockLightMask) {
+    if (blockLightMaskLen) {
       blockLightMask = stream.readLongBE();
     }
 
@@ -280,16 +383,24 @@ class ChunkColumn {
 
     auto skyLightLength = stream.readVarInt();
     for (int i = 0; i < skyLightLength; i++) {
-      stream.read(&skylight[2048 * i], 2048);
+      auto skyLightLen = stream.readVarInt();
+      assert(skyLightLen == 2048);
+      stream.read(&skylight[2048 * i], skyLightLen);
     }
     auto blockLightLength = stream.readVarInt();
     for (int i = 0; i < blockLightLength; i++) {
-      stream.read(&blocklight[2048 * i], 2048);
+      auto blockLightLen = stream.readVarInt();
+      assert(blockLightLen == 2048);
+      stream.read(&blocklight[2048 * i], blockLightLen);
     }
 
     chunk->loadNetworkSerializedLights(skylight, skyLightLength, blocklight,
                                        blockLightLength, skyLightMask,
                                        blockLightMask);
+
+    // printf("At %d / %d\n", stream.readPosition, stream.size);
+
+    stream.dumpRemaining();
 
     return chunk;
   }

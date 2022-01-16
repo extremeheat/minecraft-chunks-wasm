@@ -341,6 +341,13 @@ class BinaryStream {
   //   return result;
   // }
 
+  void dumpRemaining() {
+    for (int i = this->readPosition; i < this->size; i++) {
+      printf("%02x ", this->data[i]);
+    }
+    printf("\n");
+  }
+
   ~BinaryStream() {
     if (weAllocated) Deallocate(this->data);
   }
