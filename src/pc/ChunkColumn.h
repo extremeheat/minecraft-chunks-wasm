@@ -11,6 +11,8 @@ const int SectionHeight = 16;
 
 const int NUM_SECTIONS = 24;
 
+#define DEBUG_LOG printf
+
 class ChunkColumn {
  public:
   ChunkSection sections[NUM_SECTIONS];
@@ -44,8 +46,8 @@ class ChunkColumn {
     this->numSections = NUM_SECTIONS;
 
     for (int i = 0; i < NUM_SECTIONS; i++) {
-      this->skyLights[i].init(4, 2048);
-      this->blockLights[i].init(4, 2048);
+      this->skyLights[i].init(4, 4096);
+      this->blockLights[i].init(4, 4096);
     }
   }
 
@@ -180,7 +182,7 @@ class ChunkColumn {
     this->blockEntities.list[this->blockEntities.count++] = blockEntity;
   }
 
-  void writeNetworkSerializedTerrain(out u8 *&buffer, out int bufferSize) {
+  void writeNetworkSerializedTerrain(out u8 *&buffer, out int &bufferSize) {
     // This may seem expensive, but it's really cheap. We allocate the max size
     // possible on a CC on the stack (which is just moving stack pointer) then
     // we copy it over to the heap with the known size.
@@ -319,7 +321,7 @@ class ChunkColumn {
 
   void writeChunkPacket(out u8 *&buffer, out int &bufferSize) {
     u8 *terrainData;
-    u8 terrainLength = 0;
+    int terrainLength = 0;
     this->writeNetworkSerializedTerrain(terrainData, terrainLength);
 
     const int max_size = 1'000'000;
@@ -344,10 +346,14 @@ class ChunkColumn {
 
     stream.writeByte(0);  // Trust edge lighting
 
+    stream.writeVarInt(1);  // Sky light length
     stream.writeULongBE(skyLightMask);
+    stream.writeVarInt(1);  // Block light length
     stream.writeULongBE(blockLightMask);
     // no idea what the point of "air masks" are
+    stream.writeVarInt(1);  // Air mask length
     stream.writeULongBE(~skyLightMask);
+    stream.writeVarInt(1);  // Block mask length
     stream.writeULongBE(~blockLightMask);
 
     this->writeNetworkSerializedLights(stream);
@@ -367,17 +373,18 @@ class ChunkColumn {
     auto heightmaps = skipNBT(stream);
     if (!heightmaps) {
       // nbt reading error
-      return reinterpret_cast<ChunkColumn *>(-1);
+      return nullptr;
     }
 
-    ChunkColumn *chunk = new ChunkColumn(registry);
+    ChunkColumn *chunk = new ChunkColumn(registry, x, z);
 
     // The extra zeros at the end are a pain to deal with... we have to skip
     // them here.
     auto chunkPayloadSize = stream.readVarInt();
     auto expectedNewPosition = stream.readPosition + chunkPayloadSize;
     chunk->loadNetworkSerializedTerrain(stream);
-    printf("adjusting %d bytes\n", expectedNewPosition - stream.readPosition);
+    // Extraneous zeros at the end of the payload need to be accounted for
+    DEBUG_LOG("cc: skip %d bytes\n", expectedNewPosition - stream.readPosition);
     stream.readPosition = expectedNewPosition;
 
     // stream.dumpRemaining();

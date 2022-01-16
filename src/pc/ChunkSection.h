@@ -78,7 +78,7 @@ struct ChunkSection {
       stream.writeShortBE(0);          // occupied blocks
       stream.writeByte(0);             // bits per block
       stream.writeVarInt(palette[0]);  // palette
-      stream.writeByte(0);             // palette length
+      stream.writeByte(0);             // data length
       return;
     }
 

@@ -90,7 +90,7 @@ void skipNBTPayload(BinaryStream &stream, NBTTag &type) {
 bool skipNBT(BinaryStream &stream) {
   auto tagType = (NBTTag)stream.readByte();
   if (tagType == TAG_End) {
-    return false;
+    return true;
   } else if (tagType <= MAX_TAG) {
     auto tagNameLen = stream.readShortBE();
     stream.skip(tagNameLen);
