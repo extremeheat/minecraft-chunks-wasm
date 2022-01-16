@@ -17,8 +17,8 @@ class BinaryStream {
     this->size = size;
   }
 
-  BinaryStream(void *data, int size) { 
-    this->data = (unsigned char *)data; 
+  BinaryStream(void *data, int size) {
+    this->data = (unsigned char *)data;
     this->size = size;
   }
 
@@ -28,12 +28,11 @@ class BinaryStream {
   }
 
   void write(void *data, int size) {
-    // printf("write %d bytes , wp %d %d\n", size, this->writePosition, this->size);
     memcpy(&this->data[this->writePosition], data, size);
     this->writePosition += size;
   }
 
-  void write(BinaryStream& strm, int size) {
+  void write(BinaryStream &strm, int size) {
     this->write(strm.data + strm.writePosition, size);
   }
 
@@ -42,8 +41,9 @@ class BinaryStream {
     return this->writePosition;
   }
 
-  void save(BinaryStream& strm, int byteOffset = 0) {
-    assert(strm.size >= this->writePosition, "Stream to write to is not big enough");
+  void save(BinaryStream &strm, int byteOffset = 0) {
+    assert(strm.size >= this->writePosition,
+           "Stream to write to is not big enough");
     memcpy(strm.data, this->data + byteOffset, this->writePosition);
   }
 
@@ -139,7 +139,7 @@ class BinaryStream {
 
   unsigned char readByte() {
     assert((this->readPosition + 1) < this->size, "Reading overflow");
-    return this->data[this->readPosition++]; 
+    return this->data[this->readPosition++];
   }
 
   i32 readVarInt() {
@@ -341,5 +341,7 @@ class BinaryStream {
   //   return result;
   // }
 
-  ~BinaryStream() { if (weAllocated) Deallocate(this->data); }
+  ~BinaryStream() {
+    if (weAllocated) Deallocate(this->data);
+  }
 };

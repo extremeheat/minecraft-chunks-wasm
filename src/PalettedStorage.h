@@ -1,7 +1,7 @@
 #pragma once
-#include "Types.h"
-#include "Mem.h"
 #include "BinaryStream.h"
+#include "Mem.h"
+#include "Types.h"
 
 template <typename Word = unsigned int>
 class PalettedStorage {
@@ -33,10 +33,7 @@ class PalettedStorage {
     this->words = Allocate<Word>(this->wordsCount);
   }
 
-  void read(BinaryStream &stream) { 
-    // printf("Read %d", this->byteSize);
-    stream.read(this->words, this->byteSize); 
-  }
+  void read(BinaryStream &stream) { stream.read(this->words, this->byteSize); }
 
   void write(BinaryStream &stream) {
     stream.write(this->words, this->byteSize);
@@ -73,7 +70,5 @@ class PalettedStorage {
     printf("\n");
   }
 
-  ~PalettedStorage() { 
-    Deallocate(this->words); 
-  }
+  ~PalettedStorage() { Deallocate(this->words); }
 };

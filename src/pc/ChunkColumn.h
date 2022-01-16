@@ -187,24 +187,19 @@ class ChunkColumn {
       this->biomes[i].write(stream);
     }
 
-    buffer = (u8*)malloc(stream.writePosition);
+    buffer = (u8 *)malloc(stream.writePosition);
     bufferSize = stream.writePosition;
     stream.save(buffer);
 
     return;
   }
 
-
   void loadNetworkSerializedTerrain(BinaryStream &stream) {
     int numberOfSections = 24;
     for (int i = 0; i < numberOfSections; i++) {
       this->sections[i].read(stream);
-      // printf("Current position after chunks %d\n", stream.readPosition);
       this->biomes[i].read(stream);
-      // printf("Current position after biomes %d\n", stream.readPosition);
     }
-
-    // printf("Current position: %d out of %d\n", stream.readPosition, 0);
   }
 
   void loadNetworkSerializedTerrain(u8 *buffer, int bufferSize) {

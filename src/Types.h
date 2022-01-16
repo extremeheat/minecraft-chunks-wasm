@@ -16,11 +16,17 @@ using byte = u8;
 #define out
 
 struct Vec3 {
-   int x;
-   int y;
-   int z;
+  int x;
+  int y;
+  int z;
 
-   int operator==(const Vec3 &other) {
-      return x == other.x && y == other.y && z == other.z;
-   }
+  int operator==(const Vec3 &other) {
+    return x == other.x && y == other.y && z == other.z;
+  }
 };
+
+#ifdef _WIN32
+static inline int __builtin_clz(unsigned x) { return (int)__lzcnt(x); }
+#endif
+
+inline int log2ceil(int n) { return 32 - __builtin_clz(n - 1); }

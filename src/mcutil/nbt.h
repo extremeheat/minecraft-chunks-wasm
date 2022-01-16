@@ -1,6 +1,6 @@
 #pragma once
-#include "../Types.h"
 #include "../BinaryStream.h"
+#include "../Types.h"
 
 enum NBTTag : u8 {
   TAG_End = 0,

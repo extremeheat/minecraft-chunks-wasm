@@ -1,10 +1,10 @@
 #pragma once
 
 // #ifndef WEBASSEMBLYz
-#include <memory.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <assert.h>
+#include <memory.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 template <typename T>
 inline T *Allocate(int size) {
