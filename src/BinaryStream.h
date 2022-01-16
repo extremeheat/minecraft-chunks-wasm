@@ -1,14 +1,26 @@
 #pragma once
 #include "Types.h"
+#include "mem.h"
 
 class BinaryStream {
  public:
   unsigned char *data;
+  int size;
+
   int readPosition = 0;
   int writePosition = 0;
-  BinaryStream(int size) { this->data = Allocate<unsigned char>(size); }
+  bool weAllocated = false;
 
-  BinaryStream(void *data, int size) { this->data = (unsigned char *)data; }
+  BinaryStream(int size) {
+    weAllocated = true;
+    this->data = Allocate<unsigned char>(size);
+    this->size = size;
+  }
+
+  BinaryStream(void *data, int size) { 
+    this->data = (unsigned char *)data; 
+    this->size = size;
+  }
 
   void read(void *data, int size) {
     memcpy(data, this->data + this->readPosition, size);
@@ -16,9 +28,23 @@ class BinaryStream {
   }
 
   void write(void *data, int size) {
-    printf("write %d bytes\n", size);
-    memcpy(this->data + this->writePosition, data, size);
+    // printf("write %d bytes , wp %d %d\n", size, this->writePosition, this->size);
+    memcpy(&this->data[this->writePosition], data, size);
     this->writePosition += size;
+  }
+
+  void write(BinaryStream& strm, int size) {
+    this->write(strm.data + strm.writePosition, size);
+  }
+
+  int save(void *toOutputBuffer) {
+    memcpy(toOutputBuffer, this->data, this->writePosition);
+    return this->writePosition;
+  }
+
+  void save(BinaryStream& strm, int byteOffset = 0) {
+    assert(strm.size >= this->writePosition, "Stream to write to is not big enough");
+    memcpy(strm.data, this->data + byteOffset, this->writePosition);
   }
 
   void skip(int size) { this->readPosition += size; }
@@ -111,11 +137,15 @@ class BinaryStream {
     return result;
   }
 
-  unsigned char readByte() { return this->data[this->readPosition++]; }
+  unsigned char readByte() {
+    assert((this->readPosition + 1) < this->size, "Reading overflow");
+    return this->data[this->readPosition++]; 
+  }
 
   i32 readVarInt() {
     int result = 0;
     int shift = 0;
+    // TODO: prevent potential infinite loop here
     while (true) {
       unsigned char byte = this->readByte();
       result |= (byte & 0x7f) << shift;
@@ -143,7 +173,7 @@ class BinaryStream {
 
   i64 readVarLong() {
     long long result = 0;
-    int shift = 0;
+    long long shift = 0;
     while (true) {
       unsigned char byte = this->readByte();
       result |= (byte & 0x7f) << shift;
@@ -157,7 +187,7 @@ class BinaryStream {
 
   u64 readUVarLong() {
     u64 result = 0;
-    int shift = 0;
+    u64 shift = 0;
     while (true) {
       unsigned char byte = this->readByte();
       result |= (byte & 0x7f) << shift;
@@ -311,5 +341,5 @@ class BinaryStream {
   //   return result;
   // }
 
-  ~BinaryStream() { Deallocate(this->data); }
+  ~BinaryStream() { if (weAllocated) Deallocate(this->data); }
 };

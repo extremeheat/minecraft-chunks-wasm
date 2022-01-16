@@ -11,14 +11,14 @@ const int SectionHeight = 16;
 
 class ChunkColumn {
  public:
-  int worldHeight;
+  int worldHeight = 319;
   ChunkSection sections[24];
   BiomeSection biomes[24];
   PalettedStorage<int> skyLights[24];
   PalettedStorage<int> blockLights[24];
   struct {
-    BlockEntity *list;
-    int count;
+    BlockEntity *list = 0;
+    int count = 0;
   } blockEntities;
 
   Registry *registry;
@@ -87,10 +87,12 @@ class ChunkColumn {
   }
 
   int getBlockLight(const Vec3 &pos) {
-    return this->blockLights[co + (pos.y >> 4)].getAt(pos.x, pos.y & 0xf, pos.z);
+    return this->blockLights[co + (pos.y >> 4)].get(getLightIndex(pos));
   }
 
-  int getSkyLight(const Vec3 &pos) { return 0; }
+  int getSkyLight(const Vec3 &pos) {
+    return this->skyLights[co + (pos.y >> 4)].get(getLightIndex(pos));
+  }
 
   BlockEntity *getBlockEntity(const Vec3 &pos) {
     for (int i = 0; i < this->blockEntities.count; i++) {
@@ -138,13 +140,16 @@ class ChunkColumn {
     section.setBiomeId({pos.x, pos.y & 0xf, pos.z}, biomeId);
   }
 
+  int getLightIndex(const Vec3 &pos) {
+    return pos.x + 8 * ((pos.y & 0xf) + 16 * pos.z);
+  }
+
   void setBlockLight(const Vec3 &pos, int blockLight) {
-    this->blockLights[co + (pos.y >> 4)].setAt(pos.x, pos.y & 0xf, pos.z,
-                                             blockLight);
+    this->blockLights[co + (pos.y >> 4)].set(getLightIndex(pos), blockLight);
   }
 
   void setSkyLight(const Vec3 &pos, int skyLight) {
-    this->skyLights[co + (pos.y >> 4)].setAt(pos.x, pos.y & 0xf, pos.z, skyLight);
+    this->skyLights[co + (pos.y >> 4)].set(getLightIndex(pos), skyLight);
   }
 
   void setBlockEntity(const Vec3 &pos, BlockEntity blockEntity) {
@@ -157,16 +162,21 @@ class ChunkColumn {
     this->blockEntities.list = (BlockEntity *)realloc(
         this->blockEntities.list,
         sizeof(BlockEntity) * (this->blockEntities.count + 1));
+    assert(this->blockEntities.list != NULL);
+    this->blockEntities.list[this->blockEntities.count++] = blockEntity;
   }
 
-  void toNetworkSerialized(out u8 *buffer, out int bufferSize) {
+  void writeNetworkSerializedTerrain(out u8 *&buffer, out int bufferSize) {
     // This may seem expensive, but it's really cheap. We allocate the max size
     // possible on a CC on the stack (which is just moving stack pointer) then
     // we copy it over to the heap with the known size.
-    const int max_size = sizeof(ChunkColumn) + sizeof(ChunkSection) * 24 +
-                         sizeof(BiomeSection) * 24 +
-                         (8 * 8 * 8 * 24) /* blockLights */ +
-                         sizeof(BlockEntity) * (16 * 16 * 16 * 24);
+    // Max chunk size in Anvil/MCRegion format is 1MB/chunk
+    // WASM has default stack size limit of 5MB, so no issue here.
+#ifdef _WIN32
+    const int max_size = 500'000;
+#else
+    const int max_size = 1'000'000;
+#endif
 
     u8 tempBuffer[max_size];
     BinaryStream stream(tempBuffer, max_size);
@@ -177,20 +187,29 @@ class ChunkColumn {
       this->biomes[i].write(stream);
     }
 
-    return stream.write(buffer, bufferSize);
+    buffer = (u8*)malloc(stream.writePosition);
+    bufferSize = stream.writePosition;
+    stream.save(buffer);
+
+    return;
   }
 
-  void fromNetworkSerialized(BinaryStream &stream) {
+
+  void loadNetworkSerializedTerrain(BinaryStream &stream) {
     int numberOfSections = 24;
     for (int i = 0; i < numberOfSections; i++) {
       this->sections[i].read(stream);
+      // printf("Current position after chunks %d\n", stream.readPosition);
       this->biomes[i].read(stream);
+      // printf("Current position after biomes %d\n", stream.readPosition);
     }
+
+    // printf("Current position: %d out of %d\n", stream.readPosition, 0);
   }
 
-  void fromNetworkSerialized(u8 *buffer, int bufferSize) {
+  void loadNetworkSerializedTerrain(u8 *buffer, int bufferSize) {
     BinaryStream stream(buffer, bufferSize);
-    this->fromNetworkSerialized(stream);
+    this->loadNetworkSerializedTerrain(stream);
   }
 
   // https://wiki.vg/index.php?title=Protocol&oldid=17272#Chunk_Data_And_Update_Light
@@ -229,7 +248,7 @@ class ChunkColumn {
     ChunkColumn *chunk = new ChunkColumn(registry);
 
     auto chunkPayloadSize = stream.readVarInt();
-    chunk->fromNetworkSerialized(stream);
+    chunk->loadNetworkSerializedTerrain(stream);
 
     auto blockEntitiesCount = stream.readVarInt();
     for (int i = 0; i < blockEntitiesCount; i++) {

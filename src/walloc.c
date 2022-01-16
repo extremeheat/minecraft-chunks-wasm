@@ -20,6 +20,8 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#ifdef WEBASSEMBLY
+
 typedef __SIZE_TYPE__ size_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
 typedef __UINT8_TYPE__ uint8_t;
@@ -464,3 +466,5 @@ free(void *ptr) {
     *loc = obj;
   }
 }
+
+#endif

@@ -4,6 +4,7 @@
 #include <memory.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 template <typename T>
 inline T *Allocate(int size) {
@@ -12,7 +13,7 @@ inline T *Allocate(int size) {
 
 inline void Deallocate(void *ptr) { free(ptr); }
 
-inline void assert(bool condition, const char *message = nullptr) {
+/*inline void assert(bool condition, const char* message = nullptr) {
   if (!condition) {
     if (message) {
       printf("Assertion failed: %s\n", message);
@@ -21,8 +22,9 @@ inline void assert(bool condition, const char *message = nullptr) {
     }
     abort();
   }
-}
-#ifdef WEBASSEMBLYSOMETHING
+}*/
+
+#ifdef WEBASSEMBLY
 
 #include "walloc.h"
 
