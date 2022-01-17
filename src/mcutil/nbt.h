@@ -67,8 +67,8 @@ void skipNBTPayload(BinaryStream &stream, NBTTag &type) {
           stream.skip(tagNameLen);
           skipNBTPayload(stream, tagType);
         } else {
-          // assert(false, "Invalid tag type");
-          throw "Invalid tag type";
+          assert(false, "Invalid tag type");
+          // throw "Invalid tag type";
         }
       }
       // stream.skip(2);
@@ -82,8 +82,8 @@ void skipNBTPayload(BinaryStream &stream, NBTTag &type) {
       stream.skip(stream.readIntBE() * 8);
       break;
     default:
-      // assert(false, "Unknown tag type");
-      throw "Unknown tag type";
+      assert(false, "Unknown tag type");
+      // throw "Unknown tag type";
   }
 }
 
@@ -97,8 +97,9 @@ bool skipNBT(BinaryStream &stream) {
     skipNBTPayload(stream, tagType);
     return true;
   } else {
-    // assert(false, "Invalid tag type");
-    throw "Invalid tag type";
+    assert(false, "Invalid tag type");
+    return false;
+    // throw "Invalid tag type";
   }
 }
 

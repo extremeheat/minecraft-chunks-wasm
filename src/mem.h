@@ -1,6 +1,6 @@
 #pragma once
 
-// #ifndef WEBASSEMBLYz
+#ifndef WEBASSEMBLY
 #include <assert.h>
 #include <memory.h>
 #include <stdio.h>
@@ -13,25 +13,43 @@ inline T *Allocate(int size) {
 
 inline void Deallocate(void *ptr) { free(ptr); }
 
-/*inline void assert(bool condition, const char* message = nullptr) {
-  if (!condition) {
-    if (message) {
-      printf("Assertion failed: %s\n", message);
-    } else {
-      printf("Assertion failed\n");
-    }
-    abort();
-  }
-}*/
+void *reallocate(void *ptr, size_t old_size, size_t new_size) {
+  return realloc(ptr, new_size);
+}
+
+#define WASM_EXPORT
+
+#endif
 
 #ifdef WEBASSEMBLY
-
 #include "walloc.h"
 
-void memcpy(void *dest, void *src, size_t n) {
+extern "C" {
+
+void* memset(void* dest, int val, size_t len) {
+  auto ptr = (unsigned char*)dest;
+  while (len-- > 0)
+    *ptr++ = val;
+  return dest;
+}
+
+void abort() {
+  while (1) {
+    // oops
+  }
+}
+
+void assert(bool condition, const char *message = 0) {
+  if (!condition) {
+    // abort();
+  }
+}
+
+void* memcpy(void *dest, void *src, size_t n) {
   char *csrc = (char *)src;
   char *cdest = (char *)dest;
   for (int i = 0; i < n; i++) cdest[i] = csrc[i];
+  return dest;
 }
 
 // via
@@ -54,17 +72,28 @@ void *realloc(void *ptr, size_t originalLength, size_t newLength) {
     return ptrNew;
   }
 }
-
-void abort() {
-  while (1) {
-    // oops
-  }
 }
 
-void assert(bool condition) {
-  if (!condition) {
-    // abort();
+#define reallocate realloc
+
+template <typename T>
+inline T *Allocate(int size) {
+  auto allocSize = size * sizeof(T);
+  auto allocated = (char *)malloc(allocSize);
+  // zero out the memory
+  for (int i = 0; i < allocSize; i++) {
+    allocated[i] = 0;
   }
+  return reinterpret_cast<T *>(allocated);
 }
+
+inline void Deallocate(void *ptr) { free(ptr); }
+
+#define printf(...)
+
+// https://stackoverflow.com/a/3156822/11173996
+void *operator new(size_t, void *) throw();
+
+#define WASM_EXPORT __attribute__((visibility("default")))
 
 #endif

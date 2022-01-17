@@ -5,6 +5,9 @@
 #include "../mcutil/nbt.h"
 #include "BiomeSection.h"
 #include "ChunkSection.h"
+#ifndef WEBASSEMBLY
+#include <new>
+#endif
 
 const int SectionWidth = 16;
 const int SectionHeight = 16;
@@ -96,7 +99,10 @@ class ChunkColumn {
     }
   }
 
-  int getBlockStateId(const Vec3 &pos) { return 0; }
+  int getBlockStateId(const Vec3 &pos) {
+    auto section = this->getChunkSection(pos.y >> 4);
+    return section.getBlockStateId({pos.x, pos.y & 0xf, pos.z});
+  }
 
   int getBiomeId(const Vec3 &pos) {
     return this->biomes[co + (pos.y >> 4)].getBiomeId(pos);
@@ -174,8 +180,9 @@ class ChunkColumn {
         return;
       }
     }
-    this->blockEntities.list = (BlockEntity *)realloc(
+    this->blockEntities.list = (BlockEntity *)reallocate(
         this->blockEntities.list,
+        sizeof(BlockEntity) * (this->blockEntities.count),
         sizeof(BlockEntity) * (this->blockEntities.count + 1));
     assert(this->blockEntities.list != NULL);
     blockEntity.position = pos;
@@ -376,7 +383,8 @@ class ChunkColumn {
       return nullptr;
     }
 
-    ChunkColumn *chunk = new ChunkColumn(registry, x, z);
+    auto tmp = (ChunkColumn *)malloc(sizeof(ChunkColumn));  // allocation only
+    ChunkColumn *chunk = new (tmp) ChunkColumn(registry, x, z);
 
     // The extra zeros at the end are a pain to deal with... we have to skip
     // them here.
@@ -440,9 +448,7 @@ class ChunkColumn {
                                        blockLightMask);
 
     // printf("At %d / %d\n", stream.readPosition, stream.size);
-
-    stream.dumpRemaining();
-
+    // stream.dumpRemaining();
     return chunk;
   }
 };

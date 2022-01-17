@@ -1,6 +1,6 @@
 #pragma once
+#include "Mem.h"
 #include "Types.h"
-#include "mem.h"
 
 class BinaryStream {
  public:
