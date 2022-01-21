@@ -15,15 +15,15 @@ struct ChunkSection {
 
   inline bool isEmpty() { return empty; }
 
-  inline int getIndex(const Vec3 &pos) {
+  inline int getIndex(const Vec3i &pos) {
     return (pos.y & 0xf) << 8 | (pos.z & 0xf) << 4 | (pos.x & 0xf);
   }
 
-  void setBlockStateId(const Vec3 &pos, int stateId) {
+  void setBlockStateId(const Vec3i &pos, int stateId) {
     blocks[getIndex(pos)] = stateId;
   }
 
-  int getBlockStateId(const Vec3 &pos) { return blocks[getIndex(pos)]; }
+  int getBlockStateId(const Vec3i &pos) { return blocks[getIndex(pos)]; }
 
   void read(BinaryStream &stream) {
     this->occupiedBlocks = stream.readShortBE();

@@ -15,13 +15,15 @@ class BiomeSection {
 
   inline bool isEmpty() { return paletteLength == 0; }
 
-  inline int getIndex(const Vec3 &pos) {
+  inline int getIndex(const Vec3i &pos) {
     return (pos.y << 4) | (pos.z << 2) | pos.x;
   }
 
-  void setBiomeId(const Vec3 &pos, int biome) { blocks[getIndex(pos)] = biome; }
+  void setBiomeId(const Vec3i &pos, int biome) {
+    blocks[getIndex(pos)] = biome;
+  }
 
-  int getBiomeId(const Vec3 &pos) { return blocks[getIndex(pos)]; }
+  int getBiomeId(const Vec3i &pos) { return blocks[getIndex(pos)]; }
 
   void read(BinaryStream &stream) {
     u8 bitsPerBlock = stream.readByte();
@@ -44,7 +46,8 @@ class BiomeSection {
     auto storage = PalettedStorage<u64>(bitsPerBlock, 4 * 4 * 4);
     assert(dataLength == storage.wordsCount,
            "biome palette dataLength does not match expected");
-    // printf("Biome data len %d %d ; palette len %d\n", dataLength, storage.byteSize, paletteLength);
+    // printf("Biome data len %d %d ; palette len %d\n", dataLength,
+    // storage.byteSize, paletteLength);
     storage.read(stream);
 
     for (int i = 0; i < 4 * 4 * 4; i++) {

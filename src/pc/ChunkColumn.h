@@ -54,9 +54,9 @@ class ChunkColumn {
     }
   }
 
-  void initialize(int (*initFunction)(Vec3)) {
+  void initialize(int (*initFunction)(Vec3i)) {
     // int x = 0, y = 0, z = 0;
-    auto [x, y, z] = Vec3{0, 0, 0};
+    auto [x, y, z] = Vec3i{0, 0, 0};
     for (y = minY; y < maxY; y++) {
       for (z = 0; z < SectionWidth; z++) {
         for (x = 0; x < SectionWidth; x++) {
@@ -75,7 +75,7 @@ class ChunkColumn {
 
   BiomeSection getBiomeSection(int chunkY) { return this->biomes[co + chunkY]; }
 
-  Block getFullBlock(const Vec3 &pos) {
+  Block getFullBlock(const Vec3i &pos) {
     // clang-format off
     return {
       this->getBlockStateId(pos),
@@ -87,7 +87,7 @@ class ChunkColumn {
     // clang-format on
   }
 
-  void setBlock(const Vec3 &pos, Block &block) {
+  void setBlock(const Vec3i &pos, Block &block) {
     this->setBlockStateId(pos, block.stateId);
     this->setBiomeId(pos, block.biomeId);
     this->setBlockLight(pos, block.blockLight);
@@ -99,24 +99,24 @@ class ChunkColumn {
     }
   }
 
-  int getBlockStateId(const Vec3 &pos) {
+  int getBlockStateId(const Vec3i &pos) {
     auto section = this->getChunkSection(pos.y >> 4);
     return section.getBlockStateId({pos.x, pos.y & 0xf, pos.z});
   }
 
-  int getBiomeId(const Vec3 &pos) {
+  int getBiomeId(const Vec3i &pos) {
     return this->biomes[co + (pos.y >> 4)].getBiomeId(pos);
   }
 
-  int getBlockLight(const Vec3 &pos) {
+  int getBlockLight(const Vec3i &pos) {
     return this->blockLights[co + (pos.y >> 4)].get(getLightIndex(pos));
   }
 
-  int getSkyLight(const Vec3 &pos) {
+  int getSkyLight(const Vec3i &pos) {
     return this->skyLights[co + (pos.y >> 4)].get(getLightIndex(pos));
   }
 
-  BlockEntity *getBlockEntity(const Vec3 &pos) {
+  BlockEntity *getBlockEntity(const Vec3i &pos) {
     for (int i = 0; i < this->blockEntities.count; i++) {
       auto &blockEntity = this->blockEntities.list[i];
       if (blockEntity.position == pos) {
@@ -126,7 +126,7 @@ class ChunkColumn {
     return nullptr;
   }
 
-  bool hasBlockEntity(const Vec3 &pos) {
+  bool hasBlockEntity(const Vec3i &pos) {
     for (int i = 0; i < this->blockEntities.count; i++) {
       auto &blockEntity = this->blockEntities.list[i];
       if (blockEntity.position.x == pos.x && blockEntity.position.y == pos.y &&
@@ -137,7 +137,7 @@ class ChunkColumn {
     return false;
   }
 
-  void removeBlockEntity(const Vec3 &pos) {
+  void removeBlockEntity(const Vec3i &pos) {
     auto newList = (BlockEntity *)malloc(sizeof(BlockEntity) *
                                          (this->blockEntities.count - 1));
     for (int i = 0, j = 0; i < this->blockEntities.count; i++) {
@@ -151,29 +151,29 @@ class ChunkColumn {
     this->blockEntities.count--;
   }
 
-  void setBlockStateId(const Vec3 &pos, int stateId) {
+  void setBlockStateId(const Vec3i &pos, int stateId) {
     auto section = this->getChunkSection(pos.y >> 4);
     section.setBlockStateId({pos.x, pos.y & 0xf, pos.z}, stateId);
   }
 
-  void setBiomeId(const Vec3 &pos, int biomeId) {
+  void setBiomeId(const Vec3i &pos, int biomeId) {
     auto section = this->getBiomeSection(pos.y >> 4);
     section.setBiomeId({pos.x, pos.y & 0xf, pos.z}, biomeId);
   }
 
-  int getLightIndex(const Vec3 &pos) {
+  int getLightIndex(const Vec3i &pos) {
     return pos.x + 8 * ((pos.y & 0xf) + 16 * pos.z);
   }
 
-  void setBlockLight(const Vec3 &pos, int blockLight) {
+  void setBlockLight(const Vec3i &pos, int blockLight) {
     this->blockLights[co + (pos.y >> 4)].set(getLightIndex(pos), blockLight);
   }
 
-  void setSkyLight(const Vec3 &pos, int skyLight) {
+  void setSkyLight(const Vec3i &pos, int skyLight) {
     this->skyLights[co + (pos.y >> 4)].set(getLightIndex(pos), skyLight);
   }
 
-  void setBlockEntity(const Vec3 &pos, BlockEntity blockEntity) {
+  void setBlockEntity(const Vec3i &pos, BlockEntity blockEntity) {
     for (int i = 0; i < this->blockEntities.count; i++) {
       if (this->blockEntities.list[i].position == pos) {
         this->blockEntities.list[i] = blockEntity;
@@ -383,8 +383,7 @@ class ChunkColumn {
       return nullptr;
     }
 
-    auto tmp = (ChunkColumn *)malloc(sizeof(ChunkColumn));  // allocation only
-    ChunkColumn *chunk = new (tmp) ChunkColumn(registry, x, z);
+    ChunkColumn *chunk = new ChunkColumn(registry, x, z);
 
     // The extra zeros at the end are a pain to deal with... we have to skip
     // them here.

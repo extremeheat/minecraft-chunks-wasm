@@ -4,7 +4,7 @@
 struct BlockEntity {
   const char *tag = nullptr;
   int tagLength = 0;
-  Vec3 position;
+  Vec3i position;
 
   BlockEntity(const i8 *tag, int tagLength) : tag(tag), tagLength(tagLength) {}
 

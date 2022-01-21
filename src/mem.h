@@ -91,8 +91,10 @@ inline void Deallocate(void *ptr) { free(ptr); }
 
 #define printf(...)
 
-// https://stackoverflow.com/a/3156822/11173996
-void *operator new(size_t, void *) throw();
+void* operator new(unsigned long size) {
+  void *ptr = malloc(size);
+  return ptr;
+}
 
 #define WASM_EXPORT __attribute__((visibility("default")))
 
